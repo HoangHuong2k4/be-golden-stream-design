@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  password      String
+  telegramId    String?  @unique
+  balance       Float    @default(0)
+  status        String   @default("ACTIVE") // ACTIVE, BANNED
+  role          String   @default("USER")   // USER, ADMIN
+  createdAt     DateTime @default(now())
+
+  banks         UserBank[]
+  history       GameHistory[]
+  transactions  Transaction[]
+}
+
+model UserBank {
+  id            String   @id @default(cuid())
+  userId        String
+  bankCode      String
+  accountNumber String   @unique
+  accountName   String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model SystemBank {
+  id            String   @id @default(cuid())
+  bankName      String
+  accountNumber String   @unique
+  accountName   String
+  bin           String   // Used for QR generation
+  logo          String?  // URL to bank logo
+  merchantCode  String?  // ThueApiBank Merchant Code
+  secretKey     String?  // Webhook secret key
+  bankUser      String?  // Username for direct bank API
+  bankPass      String?  // Password for direct bank API
+  minBet        Float    @default(10000)
+  maxBet        Float    @default(3000000)
+  status        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+
+model GameHistory {
+  id            String   @id @default(cuid())
+  userId        String?
+  transactionId String   @unique
+  amount        Float
+  gameType      String   // CHAN, LE, TAI, XIU
+  lastDigit     String
+  result        String   // WIN, LOSS, PENDING
+  reward        Float    @default(0)
+  content       String?
+  createdAt     DateTime @default(now())
+
+  user          User?    @relation(fields: [userId], references: [id])
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  userId        String
+  type          String   // DEPOSIT, WITHDRAW
+  amount        Float
+  status        String   @default("PENDING") // PENDING, SUCCESS, FAILED
+  bankDetails   String?  // JSON string
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model SystemSetting {
+  key           String   @id
+  value         String
+  updatedAt     DateTime @updatedAt
+}

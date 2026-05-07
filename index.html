@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HiuDev - Cung Cấp Tài Khoản Premium Giá Rẻ</title>
+    <meta name="description" content="Chuyên cung cấp tài khoản Netflix, ChatGPT Plus, Spotify Premium chính hãng, giá rẻ, bảo hành trọn đời.">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --primary-color: #3b82f6;
+            --secondary-color: #1e293b;
+            --accent-color: #ec4899;
+            --netflix-color: #e50914;
+            --spotify-color: #1db954;
+            --chatgpt-color: #10a37f;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.15), transparent 25%);
+            background-attachment: fixed;
+        }
+
+        /* Navigation */
+        nav {
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(to right, var(--primary-color), var(--accent-color));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-color);
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 6rem 5% 4rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.8rem 2rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            color: white;
+            box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(236, 72, 153, 0.4);
+        }
+
+        /* Pricing Section */
+        .pricing {
+            padding: 4rem 5%;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex-grow: 1;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+        }
+
+        .card.netflix::before { background-color: var(--netflix-color); }
+        .card.spotify::before { background-color: var(--spotify-color); }
+        .card.chatgpt::before { background-color: var(--chatgpt-color); }
+
+        .card:hover.netflix { border-color: rgba(229, 9, 20, 0.5); box-shadow: 0 0 20px rgba(229, 9, 20, 0.1); }
+        .card:hover.spotify { border-color: rgba(29, 185, 84, 0.5); box-shadow: 0 0 20px rgba(29, 185, 84, 0.1); }
+        .card:hover.chatgpt { border-color: rgba(16, 163, 127, 0.5); box-shadow: 0 0 20px rgba(16, 163, 127, 0.1); }
+
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+
+        .netflix .card-icon { color: var(--netflix-color); }
+        .spotify .card-icon { color: var(--spotify-color); }
+        .chatgpt .card-icon { color: var(--chatgpt-color); }
+
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 1.5rem 0;
+            color: #fff;
+        }
+
+        .price span {
+            font-size: 1rem;
+            color: #94a3b8;
+            font-weight: normal;
+        }
+
+        .features {
+            list-style: none;
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+
+        .features li {
+            margin-bottom: 0.8rem;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+        }
+
+        .features li::before {
+            content: '✓';
+            color: var(--primary-color);
+            margin-right: 0.5rem;
+            font-weight: bold;
+        }
+
+        .btn-buy {
+            display: block;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.05);
+            color: white;
+            border: 1px solid var(--glass-border);
+            padding: 0.8rem;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+            margin-top: 1rem;
+        }
+
+        .btn-buy:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .netflix .btn-buy:hover { background-color: var(--netflix-color); border-color: var(--netflix-color); }
+        .spotify .btn-buy:hover { background-color: var(--spotify-color); border-color: var(--spotify-color); }
+        .chatgpt .btn-buy:hover { background-color: var(--chatgpt-color); border-color: var(--chatgpt-color); }
+
+        /* Form Section */
+        .contact-section {
+            padding: 4rem 5%;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .form-container {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 3rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-container h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 1em;
+        }
+
+        select.form-control option {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-top: 1rem;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            border-top: 1px solid var(--glass-border);
+            margin-top: auto;
+            color: #64748b;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.2rem; }
+            .nav-links { display: none; }
+            .form-container { padding: 1.5rem; }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <nav>
+        <a href="#" class="logo">HiuDev</a>
+        <div class="nav-links">
+            <a href="#">Trang chủ</a>
+            <a href="#services">Bảng giá</a>
+            <a href="#order">Đặt hàng</a>
+            <a href="#">Liên hệ</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <h1>Nâng Tầm Trải Nghiệm Giải Trí & Làm Việc</h1>
+        <p>Cung cấp tài khoản bản quyền Premium chính hãng. Bảo hành 1 đổi 1 trong suốt thời gian sử dụng. Hỗ trợ 24/7.</p>
+        <a href="#services" class="btn btn-primary">Xem Bảng Giá Ngay</a>
+    </section>
+
+    <section id="services" class="pricing">
+        
+        <!-- Netflix Card -->
+        <div class="card netflix">
+            <div class="card-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor"><path d="M6.07 1.5h1.969l4.576 10.963V1.5h2.109v21h-1.921L7.848 11.233v11.267H6.07v-21z"/></svg>
+            </div>
+            <h2>Netflix Premium</h2>
+            <div class="price">49.000đ<span>/Tháng</span></div>
+            <ul class="features">
+                <li>Độ phân giải 4K Ultra HD</li>
+                <li>Xem trên 1 thiết bị (Tài khoản phụ)</li>
+                <li>Hỗ trợ đổi ngôn ngữ tiếng Việt</li>
+                <li>Bảo hành full thời gian</li>
+            </ul>
+            <a href="#order" class="btn btn-buy" onclick="selectService('netflix')">Đăng Ký Ngay</a>
+        </div>
+
+        <!-- ChatGPT Card -->
+        <div class="card chatgpt">
+            <div class="card-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.073zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1227 8.3829a.7712.7712 0 0 0-.7806 0L6.5292 11.751v-2.3324a.0804.0804 0 0 1 .0332-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66l-.142-.0852-4.783-2.7582a.7948.7948 0 0 0-.3927.6813v6.7369l2.02-1.1686a.071.071 0 0 1 .038-.052v-5.5826zm1.5173-4.5245a4.4708 4.4708 0 0 1 .5346 3.0137l-.142-.0852-4.783-2.7582a.7712.7712 0 0 0-.7806 0l-5.8428 3.3685v-2.3324a.0804.0804 0 0 1 .0332-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.1408 1.6464zm-14.869 8.2891L3.5653 14.3475a.0757.0757 0 0 1 .071 0l4.8303 2.7865a4.504 4.504 0 0 1-1.6369-8.4905v5.6778a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685zM12 14.8979l-2.5113-1.4497v-2.8994L12 9.1001l2.5113 1.4497v2.8994L12 14.8979z"/></svg>
+            </div>
+            <h2>ChatGPT Plus</h2>
+            <div class="price">89.000đ<span>/Tháng</span></div>
+            <ul class="features">
+                <li>Truy cập GPT-4/GPT-4o mới nhất</li>
+                <li>Dùng chung tài khoản (Shared)</li>
+                <li>Tạo ảnh DALL-E 3 sắc nét</li>
+                <li>Đảm bảo riêng tư, không mất chat</li>
+            </ul>
+            <a href="#order" class="btn btn-buy" onclick="selectService('chatgpt')">Đăng Ký Ngay</a>
+        </div>
+
+        <!-- Spotify Card -->
+        <div class="card spotify">
+            <div class="card-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.24 1.021zM18.36 14c-.3.421-.84.54-1.26.24-3.36-2.04-8.52-2.64-12.48-1.44-.48.12-1.021-.18-1.141-.66-.12-.48.18-1.021.66-1.141 4.56-1.32 10.26-.66 14.16 1.74.42.3.48.84.24 1.26zm.12-3.48c-4.02-2.4-10.62-2.64-14.4-1.44-.6.18-1.26-.18-1.44-.78-.18-.6.18-1.26.78-1.44 4.44-1.32 11.76-1.021 16.32 1.68.54.3.72.96.42 1.5-.24.54-.9.78-1.44.48z"/></svg>
+            </div>
+            <h2>Spotify Premium</h2>
+            <div class="price">29.000đ<span>/Tháng</span></div>
+            <ul class="features">
+                <li>Nghe nhạc không dính quảng cáo</li>
+                <li>Nâng cấp trực tiếp trên email chính chủ</li>
+                <li>Tải nhạc nghe offline thoải mái</li>
+                <li>Chất lượng âm thanh 320kbps cực cao</li>
+            </ul>
+            <a href="#order" class="btn btn-buy" onclick="selectService('spotify')">Đăng Ký Ngay</a>
+        </div>
+
+    </section>
+
+    <!-- Order Form Section -->
+    <section id="order" class="contact-section">
+        <div class="form-container">
+            <h2>Gửi Yêu Cầu Đặt Hàng</h2>
+            <p style="text-align: center; color: #94a3b8; margin-bottom: 2rem;">Vui lòng điền thông tin bên dưới, nhân viên CSKH sẽ liên hệ hỗ trợ bạn kích hoạt tài khoản trong vòng 5 phút.</p>
+            
+            <form onsubmit="event.preventDefault(); alert('Cảm ơn bạn! Yêu cầu đặt hàng của bạn đã được gửi. Chúng tôi sẽ liên hệ lại sớm nhất.');">
+                <div class="form-group">
+                    <label for="service">Dịch vụ cần mua</label>
+                    <select id="service" class="form-control" required>
+                        <option value="" disabled selected>-- Chọn dịch vụ --</option>
+                        <option value="netflix">Netflix Premium (49.000đ/Tháng)</option>
+                        <option value="chatgpt">ChatGPT Plus (89.000đ/Tháng)</option>
+                        <option value="spotify">Spotify Premium (29.000đ/Tháng)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="duration">Gói thời gian</label>
+                    <select id="duration" class="form-control" required>
+                        <option value="1">1 Tháng</option>
+                        <option value="3">3 Tháng (Giảm 5%)</option>
+                        <option value="6">6 Tháng (Giảm 10%)</option>
+                        <option value="12">1 Năm (Tặng thêm 1 tháng)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="fullname">Họ và tên</label>
+                    <input type="text" id="fullname" class="form-control" placeholder="Nhập họ tên của bạn" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="contact">Zalo / Telegram / Số điện thoại</label>
+                    <input type="text" id="contact" class="form-control" placeholder="Để lại phương thức liên hệ" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email nhận tài khoản (nếu có)</label>
+                    <input type="email" id="email" class="form-control" placeholder="Ví dụ: email@gmail.com">
+                </div>
+
+                <button type="submit" class="submit-btn">XÁC NHẬN ĐẶT HÀNG</button>
+            </form>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 HiuDev Services. Chuyên cung cấp tài khoản Premium bản quyền.</p>
+        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Uy Tín - Chất Lượng - Nhanh Chóng</p>
+    </footer>
+
+    <script>
+        function selectService(serviceValue) {
+            const selectElement = document.getElementById('service');
+            if(selectElement) {
+                selectElement.value = serviceValue;
+            }
+        }
+    </script>
+</body>
+</html>
