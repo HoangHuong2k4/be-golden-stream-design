@@ -88,3 +88,15 @@ model SystemSetting {
   value         String
   updatedAt     DateTime @updatedAt
 }
+
+model News {
+  id            String   @id @default(cuid())
+  title         String
+  slug          String   @unique
+  content       String   @db.LongText
+  category      String   @default("GUIDE") // GUIDE, ANNOUNCEMENT, NEWS
+  thumbnail     String?
+  status        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

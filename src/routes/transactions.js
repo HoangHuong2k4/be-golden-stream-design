@@ -65,7 +65,7 @@ transactions.post('/withdraw', authMiddleware, async (c) => {
       const message = `<b>🔔 YÊU CẦU RÚT TIỀN MỚI</b>\n\n` +
         `👤 Người dùng: <b>${user.username}</b>\n` +
         `💰 Số tiền: <b>${amount.toLocaleString()}đ</b>\n` +
-        `🏦 Ngân hàng: <code>${bankDetails.bankCode}</code>\n` +
+        `🏦 Ngân hàng: <b>${bankDetails.bankName || bankDetails.bankCode}</b>\n` +
         `💳 STK: <code>${bankDetails.accountNumber}</code>\n` +
         `👤 Chủ thẻ: <code>${bankDetails.accountName}</code>\n` +
         `🆔 Mã lệnh: <code>${transaction.id}</code>\n\n` +

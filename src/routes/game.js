@@ -63,17 +63,22 @@ game.get('/admin/history', authMiddleware, adminMiddleware, async (c) => {
   }
 });
 
-// GET /api/game/system-banks — Lấy system banks public (cho FE hiển thị QR nạp tiền)
-game.get('/system-banks', authMiddleware, async (c) => {
+// POST /api/game/admin/delete-history — Xóa một dòng lịch sử
+game.post('/admin/delete-history', authMiddleware, adminMiddleware, async (c) => {
   try {
-    const banks = await prisma.systemBank.findMany({
-      where: { status: true },
-      select: {
-        id: true, bankName: true, accountNumber: true,
-        accountName: true, bin: true, logo: true,
-      },
-    });
-    return c.json(banks);
+    const { id } = await c.req.json();
+    await prisma.gameHistory.delete({ where: { id } });
+    return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /api/game/admin/clear-history — Xóa sạch lịch sử
+game.post('/admin/clear-history', authMiddleware, adminMiddleware, async (c) => {
+  try {
+    await prisma.gameHistory.deleteMany({});
+    return c.json({ success: true });
   } catch (e) {
     return c.json({ error: e.message }, 500);
   }

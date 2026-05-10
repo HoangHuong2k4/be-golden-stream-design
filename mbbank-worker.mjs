@@ -8,7 +8,7 @@ import { sendMessage, notifyAdmin, notifyUserByUsername, notifyBetResult } from 
 
 const prisma = new PrismaClient();
 const CHECK_INTERVAL = 15000;
-const LOG_FILE = path.join(process.cwd(), 'mbbank.log');
+const LOG_FILE = path.join(process.cwd(), 'logs', 'mbbank.log');
 
 function logToFile(message) {
   const time = new Date().toLocaleString();
@@ -43,27 +43,27 @@ async function sendTelegram(token, chatId, text) {
 }
 
 async function processMBBank() {
-  logToFile("Đang kiểm tra giao dịch MBBank...");
+  // logToFile("Đang kiểm tra giao dịch MBBank...");
 
   try {
     const banks = await prisma.systemBank.findMany({
-      where: { 
+      where: {
         bankUser: { not: null },
         bankPass: { not: null },
-        status: true 
+        status: true
       }
     });
 
     if (banks.length === 0) {
-       logToFile("-> Không có ngân hàng nào được cấu hình MBBank Direct.");
-       return;
+      logToFile("-> Không có ngân hàng nào được cấu hình MBBank Direct.");
+      return;
     }
 
     const settings = await prisma.systemSetting.findMany({
       where: { key: { in: ["TELEGRAM_BOT_TOKEN_ADMIN", "TELEGRAM_BOT_TOKEN_NOTIFY", "TELEGRAM_ADMIN_ID"] } }
     });
     const config = Object.fromEntries(settings.map(s => [s.key, s.value]));
-    
+
     // Fallback nếu không có token riêng cho admin thì dùng chung token notify
     const adminToken = config.TELEGRAM_BOT_TOKEN_ADMIN || config.TELEGRAM_BOT_TOKEN_NOTIFY;
     const userToken = config.TELEGRAM_BOT_TOKEN_NOTIFY || config.TELEGRAM_BOT_TOKEN_ADMIN;
@@ -78,7 +78,7 @@ async function processMBBank() {
 
     for (const bank of banks) {
       try {
-        logToFile(`[MB ${bank.accountNumber}] Đang kết nối...`);
+        // logToFile(`[MB ${bank.accountNumber}] Đang kết nối...`);
         const mb = new MB({
           username: bank.bankUser,
           password: bank.bankPass,
@@ -95,7 +95,7 @@ async function processMBBank() {
                 },
                 body: `body=${encodeURIComponent(base64Img)}`
               });
-              
+
               const text = await res.text();
               console.log("[MB Worker] AI Captcha Response:", text.substring(0, 100));
 
@@ -104,7 +104,7 @@ async function processMBBank() {
                 if (code && code.length === 6) return code;
               }
               // Nếu AI không giải được hoặc trả về sai độ dài, trả về 1 chuỗi rác 6 số để thoát lặp
-              return "000000"; 
+              return "000000";
             } catch (err) {
               console.log("[MB Worker] Lỗi giải captcha AI:", err.message);
               return "000000";
@@ -115,7 +115,7 @@ async function processMBBank() {
 
         // Đăng nhập
         await mb.login();
-        logToFile(`[MB ${bank.accountNumber}] Đăng nhập thành công.`);
+        // logToFile(`[MB ${bank.accountNumber}] Đăng nhập thành công.`);
 
         // Tự động lấy danh sách tài khoản thực tế để tránh lỗi GW300
         let targetAccountNumber = bank.accountNumber;
@@ -134,8 +134,8 @@ async function processMBBank() {
 
         const now = new Date();
         const todayStr = formatDate(now);
-        
-        logToFile(`[MB ${targetAccountNumber}] Đang lấy lịch sử ngày ${todayStr}...`);
+
+        // logToFile(`[MB ${targetAccountNumber}] Đang lấy lịch sử ngày ${todayStr}...`);
         const history = await mb.getTransactionsHistory({
           accountNumber: targetAccountNumber,
           fromDate: todayStr,
@@ -146,7 +146,7 @@ async function processMBBank() {
         const transactions = Array.isArray(history) ? history : (history?.transactionHistoryList || []);
 
         if (!Array.isArray(transactions) || transactions.length === 0) {
-          logToFile(`[MB ${targetAccountNumber}] Không tìm thấy giao dịch nào.`);
+          // logToFile(`[MB ${targetAccountNumber}] Không tìm thấy giao dịch nào.`);
           continue;
         }
 
@@ -166,7 +166,7 @@ async function processMBBank() {
 
           if (rejectReason) {
             logToFile(`[MB] Giao dịch ${transactionID} bị từ chối: ${creditAmount} ${rejectReason}`);
-            
+
             // [PRO] Thông báo Admin qua Service
             await notifyAdmin(`<b>⚠️ MBBANK: SAI HẠN MỨC</b>\n\n` +
               `💰 Số tiền: <b>${creditAmount.toLocaleString()}đ</b>\n` +
@@ -184,7 +184,7 @@ async function processMBBank() {
             }
             continue;
           }
-          
+
           logToFile(`-> Tìm thấy giao dịch: ${transactionID} | Số tiền: ${creditAmount} | Nội dung: ${description}`);
 
           const isExist = await prisma.gameHistory.findUnique({
@@ -197,6 +197,76 @@ async function processMBBank() {
 
           // Regex linh hoạt: Tìm [username] [phân cách] [code]. Phân cách có thể là khoảng trắng, dấu gạch ngang, dấu chấm...
           const match = description.match(/([a-zA-Z0-9_]+)[\s\-\.\|]+(KC|KL|KT|KX)/i);
+
+          // Kiểm tra xem có phải là nạp tiền không (NAP + username)
+          const depositMatch = description.match(/NAP([a-zA-Z0-9_]+)/i);
+
+          if (depositMatch && !match) {
+            const fullMatch = depositMatch[1].toLowerCase();
+            let username = fullMatch;
+            let user = await prisma.user.findUnique({ where: { username } });
+
+            // Nếu không tìm thấy user, thử bỏ 5 số cuối (suffix)
+            if (!user && fullMatch.length > 5) {
+              username = fullMatch.substring(0, fullMatch.length - 5);
+              user = await prisma.user.findUnique({ where: { username } });
+            }
+
+            if (user) {
+              const isExistTx = await prisma.transaction.findFirst({
+                where: {
+                  userId: user.id,
+                  type: "DEPOSIT",
+                  bankDetails: { contains: String(transactionID) }
+                }
+              });
+
+              if (isExistTx) {
+                logToFile(`   [SKIP] Giao dịch nạp tiền ${transactionID} đã xử lý.`);
+                continue;
+              }
+
+              const updatedUser = await prisma.$transaction(async (txDb) => {
+                const u = await txDb.user.update({
+                  where: { id: user.id },
+                  data: { balance: { increment: creditAmount } }
+                });
+
+                await txDb.transaction.create({
+                  data: {
+                    userId: user.id,
+                    type: "DEPOSIT",
+                    amount: creditAmount,
+                    status: "SUCCESS",
+                    bankDetails: `MBBank Auto | ID: ${transactionID} | Desc: ${description}`
+                  }
+                });
+                return u;
+              });
+
+              logToFile(`[DEPOSIT] Đã nạp thành công ${creditAmount.toLocaleString()}đ cho user ${user.username}`);
+
+              const adminMsg = `<b>✅ NẠP TIỀN THÀNH CÔNG</b>\n\n` +
+                `👤 Người dùng: <b>${user.username}</b>\n` +
+                `💰 Số tiền: <b>+${creditAmount.toLocaleString()}đ</b>\n` +
+                `🆔 Mã GD: <code>${transactionID}</code>\n` +
+                `🎊 Chúc bạn chơi game vui vẻ!`;
+
+              const userMsg = `<b>✅ NẠP TIỀN THÀNH CÔNG</b>\n\n` +
+                `👤 Người dùng: <b>${user.username}</b>\n` +
+                `💰 Số tiền: <b>+${creditAmount.toLocaleString()}đ</b>\n` +
+                `💰 Số dư hiện tại: <b>${updatedUser.balance.toLocaleString()}đ</b>\n` +
+                `🆔 Mã GD: <code>${transactionID}</code>\n` +
+                `🎊 Chúc bạn chơi game vui vẻ!`;
+
+              await notifyAdmin(`<b>💰 THÔNG BÁO NẠP TIỀN</b>\n\n` + adminMsg);
+              if (user.telegramId) {
+                await notifyUserByUsername(user.username, userMsg);
+              }
+              continue;
+            }
+          }
+
           if (!match) {
             logToFile(`   [SKIP] Nội dung không chứa mã cược hợp lệ.`);
             // Thông báo cho Admin về giao dịch sai nội dung để xử lý hoàn 90%
@@ -206,7 +276,7 @@ async function processMBBank() {
               `🆔 Mã GD: <code>${transactionID}</code>\n\n` +
               `❗ <i>Lưu ý: Hoàn 90% cho giao dịch này.</i>`;
             await sendTelegram(adminToken, adminId, alertMsg);
-            
+
             // Lưu vào lịch sử là sai nội dung
             await prisma.gameHistory.create({
               data: {
@@ -226,7 +296,7 @@ async function processMBBank() {
           const username = match[1].toLowerCase();
           const gameCode = match[2].toUpperCase();
           const rule = GAME_RULES[gameCode];
-          
+
           const user = await prisma.user.findUnique({ where: { username } });
           if (!user) {
             logToFile(`   [SKIP] Không tìm thấy người dùng: ${username}`);
@@ -277,14 +347,14 @@ async function processMBBank() {
           await sendTelegram(adminToken, adminId, adminMsg);
 
           if (user.telegramId) {
-             const userMsg = isWin 
-               ? `🏆 <b>MBBANK: THẮNG KÈO!</b>\n\n` +
-                 `🔢 4 số cuối mã GD: <b>${String(transactionID).slice(-4)}</b>\n` +
-                 `💰 Nhận được: <b>+${reward.toLocaleString()}đ</b>` + footerNote
-               : `❌ <b>MBBANK: KẾT QUẢ THUA</b>\n\n` +
-                 `🔢 4 số cuối mã GD: <b>${String(transactionID).slice(-4)}</b>\n` +
-                 `💸 Chúc bạn may mắn lần sau!` + footerNote;
-             await sendTelegram(userToken, user.telegramId, userMsg);
+            const userMsg = isWin
+              ? `🏆 <b>MBBANK: THẮNG KÈO!</b>\n\n` +
+              `🔢 4 số cuối mã GD: <b>${String(transactionID).slice(-4)}</b>\n` +
+              `💰 Nhận được: <b>+${reward.toLocaleString()}đ</b>` + footerNote
+              : `❌ <b>MBBANK: KẾT QUẢ THUA</b>\n\n` +
+              `🔢 4 số cuối mã GD: <b>${String(transactionID).slice(-4)}</b>\n` +
+              `💸 Chúc bạn may mắn lần sau!` + footerNote;
+            await sendTelegram(userToken, user.telegramId, userMsg);
           }
           logToFile(`-> Đã xử lý GD ${transactionID}: ${username} ${isWin ? 'THẮNG' : 'THUA'}`);
         }

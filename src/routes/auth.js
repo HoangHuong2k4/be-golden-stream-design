@@ -1,3 +1,4 @@
+import logger from "../lib/logger.js";
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -51,7 +52,20 @@ auth.post('/register', rateLimiter({ max: 3, windowMs: 5 * 60 * 1000 }), async (
       include: { banks: true },
     });
 
-    return c.json({ success: true, user: { id: user.id, username: user.username } });
+    const payload = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      balance: user.balance,
+      status: user.status,
+      telegramId: user.telegramId,
+      bankCode: bankCode ?? null,
+      bankAccountNumber: accountNumber ?? null,
+      bankAccountName: accountName ?? null,
+    };
+
+    const token = signToken(payload);
+    return c.json({ success: true, token, user: payload });
   } catch (e) {
     if (e.name === 'ZodError') return c.json({ error: 'Dữ liệu không hợp lệ', details: e.errors }, 400);
     return c.json({ error: e.message }, 500);
@@ -93,6 +107,7 @@ auth.post('/login', async (c) => {
     };
 
     const token = signToken(payload);
+    // logger.info(`User ${user.username} logged in successfully with role ${user.role}`);
     return c.json({ success: true, token, user: payload });
   } catch (e) {
     if (e.name === 'ZodError') return c.json({ error: 'Dữ liệu không hợp lệ' }, 400);
@@ -157,6 +172,36 @@ auth.put('/profile', authMiddleware, async (c) => {
 
     return c.json({ success: true });
   } catch (e) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// POST /api/auth/change-password
+auth.post('/change-password', authMiddleware, async (c) => {
+  try {
+    const jwtUser = c.get('user');
+    const body = await c.req.json();
+    const { currentPassword, newPassword } = z.object({
+      currentPassword: z.string().min(6),
+      newPassword: z.string().min(6),
+    }).parse(body);
+
+    const user = await prisma.user.findUnique({ where: { id: jwtUser.id } });
+    if (!user) return c.json({ error: 'User không tồn tại' }, 404);
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return c.json({ error: 'Mật khẩu hiện tại không chính xác' }, 400);
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedNewPassword }
+    });
+
+    // logger.info(`User ${user.username} changed password successfully`);
+    return c.json({ success: true, message: 'Đổi mật khẩu thành công!' });
+  } catch (e) {
+    if (e.name === 'ZodError') return c.json({ error: 'Dữ liệu không hợp lệ' }, 400);
     return c.json({ error: e.message }, 500);
   }
 });

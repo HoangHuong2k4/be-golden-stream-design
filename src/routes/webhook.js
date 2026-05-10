@@ -65,6 +65,74 @@ webhook.post('/mbbank', async (c) => {
       if (isExist) continue;
 
       const match = description.match(/([a-zA-Z0-9_]+)[\s\-\.\|]+(KC|KL|KT|KX)/i);
+      const depositMatch = description.match(/NAP([a-zA-Z0-9_]+)/i);
+
+      // Xử lý nạp tiền tự động qua Webhook
+      if (depositMatch && !match) {
+        const fullMatch = depositMatch[1].toLowerCase();
+        let username = fullMatch;
+        let user = await prisma.user.findUnique({ where: { username } });
+        
+        // Nếu không tìm thấy user, thử bỏ 5 số cuối (suffix)
+        if (!user && fullMatch.length > 5) {
+          username = fullMatch.substring(0, fullMatch.length - 5);
+          user = await prisma.user.findUnique({ where: { username } });
+        }
+        
+        if (user) {
+          const isExistTx = await prisma.transaction.findFirst({
+            where: { 
+              userId: user.id,
+              type: "DEPOSIT",
+              bankDetails: { contains: String(transactionID) }
+            }
+          });
+
+          if (!isExistTx) {
+            const updatedUser = await prisma.$transaction(async (txDb) => {
+              const u = await txDb.user.update({
+                where: { id: user.id },
+                data: { balance: { increment: amount } }
+              });
+              
+              await txDb.transaction.create({
+                data: {
+                  userId: user.id,
+                  type: "DEPOSIT",
+                  amount: amount,
+                  status: "SUCCESS",
+                  bankDetails: `Webhook Auto | ID: ${transactionID} | Desc: ${description}`
+                }
+              });
+              return u;
+            });
+
+            const adminMsg = `<b>✅ NẠP TIỀN THÀNH CÔNG (WEBHOOK)</b>\n\n` +
+              `👤 Người dùng: <b>${user.username}</b>\n` +
+              `💰 Số tiền: <b>+${amount.toLocaleString()}đ</b>\n` +
+              `🆔 Mã GD: <code>${transactionID}</code>\n` +
+              `🎊 Chúc bạn chơi game vui vẻ!`;
+
+            const userMsg = `<b>✅ NẠP TIỀN THÀNH CÔNG</b>\n\n` +
+              `👤 Người dùng: <b>${user.username}</b>\n` +
+              `💰 Số tiền: <b>+${amount.toLocaleString()}đ</b>\n` +
+              `💰 Số dư hiện tại: <b>${updatedUser.balance.toLocaleString()}đ</b>\n` +
+              `🆔 Mã GD: <code>${transactionID}</code>\n` +
+              `🎊 Chúc bạn chơi game vui vẻ!`;
+              
+            const notifyAdmin = (await import('../telegram-bot.js')).notifyAdmin;
+            const notifyUserByUsername = (await import('../telegram-bot.js')).notifyUserByUsername;
+            
+            await notifyAdmin(`<b>💰 THÔNG BÁO NẠP TIỀN</b>\n\n` + adminMsg);
+            if (user.telegramId) {
+              await notifyUserByUsername(user.username, userMsg);
+            }
+          }
+          processedIds.push(transactionID);
+          continue;
+        }
+      }
+
       if (!match) {
         await notifyAdmin(`<b>⚠️ WEBHOOK: SAI NỘI DUNG</b>\n\n` +
           `💰 Số tiền: <b>${betAmount.toLocaleString()}đ</b>\n` +
@@ -122,6 +190,56 @@ webhook.post('/mbbank', async (c) => {
     return c.json({ status: 'success', processed: processedIds });
   } catch (error) {
     console.error('[Webhook Error]', error);
+    return c.json({ status: 'error', message: error.message }, 500);
+  }
+});
+
+// POST /api/webhook/sepay — Nhận webhook từ SePay
+webhook.post('/sepay', async (c) => {
+  try {
+    const signature = c.req.header('signature') || '';
+    const secretSetting = await prisma.systemSetting.findUnique({ where: { key: 'THUEAPIBANK_SECRET_KEY' } });
+    
+    if (secretSetting?.value && signature !== secretSetting.value) {
+      return c.json({ status: 'error', message: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    if (body?.status !== 'success' || !Array.isArray(body?.transactions)) {
+      return c.json({ status: 'ok', message: 'No transactions' });
+    }
+
+    const results = [];
+    for (const tx of body.transactions) {
+      if (tx.type !== 'IN') continue;
+
+      const transactionID = String(tx.transactionID);
+      const amount = parseFloat(tx.amount) || 0;
+      const description = tx.description || "";
+
+      const existing = await prisma.gameHistory.findFirst({ where: { transactionId: transactionID } });
+      if (existing) {
+        results.push(`SKIP:${transactionID}`);
+        continue;
+      }
+
+      await prisma.gameHistory.create({
+        data: {
+          transactionId: transactionID,
+          amount,
+          gameType: 'DEPOSIT',
+          lastDigit: '0',
+          result: 'PENDING',
+          reward: 0,
+          content: description,
+        }
+      });
+      results.push(`OK:${transactionID}`);
+    }
+
+    return c.json({ status: 'success', processed: results });
+  } catch (error) {
+    console.error('[SePay Webhook Error]', error);
     return c.json({ status: 'error', message: error.message }, 500);
   }
 });

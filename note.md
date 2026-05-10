@@ -68,3 +68,4 @@
 - `/src/routes/`: Nơi chứa các API xử lý logic Admin và User.
 - `/prisma/schema.prisma`: Nơi định nghĩa cấu trúc dữ liệu.
 - `/payment-service/`: Nơi chứa Docker giải captcha.
+
