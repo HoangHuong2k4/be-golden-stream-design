@@ -24,6 +24,8 @@ model User {
   banks         UserBank[]
   history       GameHistory[]
   transactions  Transaction[]
+
+  @@index([createdAt])
 }
 
 model UserBank {
@@ -36,6 +38,8 @@ model UserBank {
   createdAt     DateTime @default(now())
 
   user          User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model SystemBank {
@@ -69,6 +73,10 @@ model GameHistory {
   createdAt     DateTime @default(now())
 
   user          User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([transactionId])
+  @@index([createdAt])
 }
 
 model Transaction {
@@ -81,6 +89,9 @@ model Transaction {
   createdAt     DateTime @default(now())
 
   user          User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model SystemSetting {

@@ -73,7 +73,7 @@ auth.post('/register', rateLimiter({ max: 3, windowMs: 5 * 60 * 1000 }), async (
 });
 
 // POST /api/auth/login
-auth.post('/login', async (c) => {
+auth.post('/login', rateLimiter({ max: 10, windowMs: 1 * 60 * 1000 }), async (c) => {
   try {
     const body = await c.req.json();
     const { username, password } = z.object({
@@ -89,7 +89,10 @@ auth.post('/login', async (c) => {
     if (!user) return c.json({ error: 'Tài khoản không tồn tại!' }, 400);
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return c.json({ error: 'Mật khẩu không chính xác!' }, 400);
+    if (!isMatch) {
+      logger.warn(`Failed login attempt for user: ${username}`);
+      return c.json({ error: 'Mật khẩu không chính xác!' }, 400);
+    }
 
     if (user.status === 'BANNED') return c.json({ error: 'Tài khoản của bạn đã bị khóa!' }, 403);
 
@@ -107,10 +110,11 @@ auth.post('/login', async (c) => {
     };
 
     const token = signToken(payload);
-    // logger.info(`User ${user.username} logged in successfully with role ${user.role}`);
+    logger.info(`User ${user.username} logged in successfully`);
     return c.json({ success: true, token, user: payload });
   } catch (e) {
     if (e.name === 'ZodError') return c.json({ error: 'Dữ liệu không hợp lệ' }, 400);
+    logger.error(`Login error: ${e.message}`);
     return c.json({ error: e.message }, 500);
   }
 });

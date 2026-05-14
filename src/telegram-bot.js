@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { Telegraf } from 'telegraf';
+import logger from './lib/logger.js';
 
 const prisma = new PrismaClient();
 let botInstance = null;
@@ -17,16 +18,45 @@ export async function getBotToken() {
 }
 
 /**
- * Khởi tạo Bot instance (Singleton)
+ * Khởi tạo Bot instance (Singleton per token)
  */
-export async function getBot() {
-  if (botInstance) return botInstance;
-  const token = await getBotToken();
+const botInstances = {};
+
+export async function getBot(type = 'default') {
+  if (botInstances[type]) return botInstances[type];
+
+  const keys = type === 'notify' 
+    ? ["TELEGRAM_BOT_TOKEN_NOTIFY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN_ADMIN"]
+    : ["TELEGRAM_BOT_TOKEN_ADMIN", "TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN_NOTIFY"];
+
+  const settings = await prisma.systemSetting.findMany({
+    where: { key: { in: keys } }
+  });
+  
+  const config = Object.fromEntries(settings.map(s => [s.key, s.value]));
+  const token = keys.map(k => config[k]).find(v => !!v);
+
   if (!token) return null;
+
+  if (botInstances[token]) {
+    botInstances[type] = botInstances[token];
+    return botInstances[token];
+  }
+
   const bot = new Telegraf(token);
+  bot.catch((err, ctx) => logger.error(`[Telegraf] Error for ${ctx.updateType}:`, { error: err.message, stack: err.stack }));
   
-  bot.catch((err, ctx) => console.error(`[Telegraf] Error for ${ctx.updateType}:`, err));
-  
+  // Only start listener for the "default" or "notify" bot if it's the primary one
+  if (type === 'default' || type === 'notify') {
+    setupBotCommands(bot);
+  }
+
+  botInstances[token] = bot;
+  botInstances[type] = bot;
+  return bot;
+}
+
+function setupBotCommands(bot) {
   bot.start(async (ctx) => {
     const chatId = ctx.chat.id;
     const payload = ctx.startPayload; // Payload sau ?start=
@@ -35,6 +65,8 @@ export async function getBot() {
       try {
         // Decode base64 username
         const username = Buffer.from(payload, 'base64').toString('utf8');
+        logger.info(`[TelegramBot] Linking user ${username} with chatId ${chatId}`);
+        
         const user = await prisma.user.findUnique({ 
           where: { username: username.toLowerCase() },
           include: {
@@ -46,6 +78,7 @@ export async function getBot() {
           // Kiểm tra xem ID này đã liên kết với ai chưa
           const existing = await prisma.user.findUnique({ where: { telegramId: String(chatId) } });
           if (existing && existing.id !== user.id) {
+             logger.warn(`[TelegramBot] ID ${chatId} already linked to ${existing.username}, skip linking to ${user.username}`);
              return ctx.replyWithHTML(`⚠️ ID Telegram này đã được liên kết với tài khoản <b>${existing.username}</b>. Vui lòng sử dụng tài khoản khác.`);
           }
 
@@ -74,6 +107,8 @@ export async function getBot() {
 
           const bankText = bank ? `🏦 <b>${bankName}</b> - <code>${bank.accountNumber}</code>` : "<i>Chưa liên kết ngân hàng</i>";
 
+          logger.info(`[TelegramBot] User ${user.username} linked successfully`);
+
           return ctx.replyWithHTML(
             `🎲 Xin chào <b>${user.username}</b>, tài khoản của bạn đã được <b>LIÊN KẾT THÀNH CÔNG</b>!\n\n` +
             `Mọi thay đổi liên quan tới tài khoản của bạn chúng tôi sẽ thông báo tại đây.\n\n` +
@@ -81,9 +116,11 @@ export async function getBot() {
             `💰 SỐ DƯ: <b>${user.balance.toLocaleString()}đ</b>\n\n` +
             `<i>Lưu ý: Vui lòng truy cập web, đăng xuất và đăng nhập lại nếu bạn nhận được thông báo tài khoản chưa liên kết telegram!!!</i>`
           );
+        } else {
+          logger.warn(`[TelegramBot] User not found for payload: ${username}`);
         }
       } catch (e) {
-        console.error("[TelegramBot] Payload error:", e);
+        logger.error("[TelegramBot] Payload error:", { payload, error: e.message });
       }
     }
 
@@ -101,26 +138,20 @@ export async function getBot() {
       `2️⃣ <b>Bước 2:</b> Nội dung chuyển khoản là mã cược của bạn (C1, L1, T1...).\n` +
       `3️⃣ <b>Bước 3:</b> Kết quả dựa trên số cuối mã giao dịch ngân hàng.\n` +
       `4️⃣ <b>Bước 4:</b> Trả thưởng tự động 100% trong 1-3 phút.\n\n` +
-      `🚀 <b>OKVIPBANK</b> - Uy tín, bảo mật và tốc độ!\n` +
+      `🚀 <b>MoneyWin</b> - Uy tín, bảo mật và tốc độ!\n` +
       `🍀 Chúc bạn vạn sự may mắn!`
     );
   });
-
-  botInstance = bot;
-  return bot;
 }
 
 /**
  * Gửi tin nhắn thô (Base function)
  */
-export async function sendMessage(chatId, text) {
+export async function sendMessage(chatId, text, type = 'default') {
   if (!chatId) return;
-  try {
-    const bot = await getBot();
-    if (bot) await bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' });
-  } catch (error) {
-    console.error("[TelegramService] Send error:", error.message);
-  }
+  const bot = await getBot(type);
+  if (!bot) throw new Error("Chưa cấu hình Telegram Bot Token");
+  return await bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' });
 }
 
 /**
@@ -130,10 +161,10 @@ export async function notifyAdmin(text) {
   try {
     const adminSetting = await prisma.systemSetting.findUnique({ where: { key: "TELEGRAM_ADMIN_ID" } });
     if (adminSetting?.value) {
-      await sendMessage(adminSetting.value, text);
+      await sendMessage(adminSetting.value, text, 'admin');
     }
   } catch (error) {
-    console.error("[TelegramService] Admin Notify Error:", error.message);
+    logger.error("[TelegramService] Admin Notify Error:", { error: error.message });
   }
 }
 
@@ -144,10 +175,10 @@ export async function notifyUserByUsername(username, text) {
   try {
     const user = await prisma.user.findUnique({ where: { username: username.toLowerCase() } });
     if (user?.telegramId) {
-      await sendMessage(user.telegramId, text);
+      await sendMessage(user.telegramId, text, 'notify');
     }
   } catch (error) {
-    console.error("[TelegramService] User Notify Error:", error.message);
+    logger.error("[TelegramService] User Notify Error:", { username, error: error.message });
   }
 }
 
@@ -178,13 +209,21 @@ export async function notifyBetResult(data) {
  */
 export async function startTelegramBot() {
   try {
-    const bot = await getBot();
-    if (bot) {
-      bot.launch();
-      console.log("[TelegramBot] Service started (Polling active)");
+    // Khởi động bot notify (dành cho người chơi)
+    const notifyBot = await getBot('notify');
+    if (notifyBot) {
+      notifyBot.launch();
+      logger.info("[TelegramBot] Notify Bot started");
+    }
+
+    // Khởi động bot admin (nếu khác bot notify)
+    const adminBot = await getBot('admin');
+    if (adminBot && adminBot !== notifyBot) {
+      adminBot.launch();
+      logger.info("[TelegramBot] Admin Bot started");
     }
   } catch (error) {
-    console.error("[TelegramBot] Launch error:", error.message);
+    logger.error("[TelegramBot] Launch error:", { error: error.message });
     setTimeout(startTelegramBot, 10000);
   }
 }

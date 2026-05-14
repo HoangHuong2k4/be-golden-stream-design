@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { prisma } from '../lib/prisma.js';
 import { sendMessage } from '../telegram-bot.js';
+import { notifyAdminByEmail, notifyUserByEmail, buildDepositAdminHtml, buildDepositUserHtml, buildBetResultHtml } from '../email-service.js';
+import logger from '../lib/logger.js';
 
 const webhook = new Hono();
 
@@ -25,11 +27,13 @@ webhook.post('/mbbank', async (c) => {
     const validKeys = new Set([config.THUEAPIBANK_SECRET_KEY, ...systemBanks.map(b => b.secretKey)].filter(Boolean));
 
     if (validKeys.size > 0 && !validKeys.has(signature)) {
-      console.warn(`[Webhook] Unauthorized signature: ${signature}`);
+      logger.warn(`[Webhook] Unauthorized signature: ${signature}`);
       return c.json({ status: 'error', message: 'Unauthorized' }, 401);
     }
 
     const body = await c.req.json();
+    logger.info('[Webhook] Received payload:', { signature, body: JSON.stringify(body).substring(0, 500) });
+    
     let transactions = [];
 
     // Phân loại payload từ ThueApiBank hoặc payment-service (cái bạn vừa clone)
@@ -48,12 +52,9 @@ webhook.post('/mbbank', async (c) => {
         description: body.payment.content
       }];
     } else {
+      logger.info('[Webhook] No valid transactions in payload');
       return c.json({ status: 'ok' });
     }
-
-    const adminToken = config.TELEGRAM_BOT_TOKEN_ADMIN || config.TELEGRAM_BOT_TOKEN_NOTIFY;
-    const userToken = config.TELEGRAM_BOT_TOKEN_NOTIFY || config.TELEGRAM_BOT_TOKEN_ADMIN;
-    const adminId = config.TELEGRAM_ADMIN_ID;
 
     const processedIds = [];
 
@@ -61,8 +62,13 @@ webhook.post('/mbbank', async (c) => {
       const { transactionID, amount, description } = tx;
       const betAmount = amount;
 
+      logger.info(`[Webhook] Processing Tx: ${transactionID} | Amount: ${amount} | Desc: ${description}`);
+
       const isExist = await prisma.gameHistory.findUnique({ where: { transactionId: String(transactionID) } });
-      if (isExist) continue;
+      if (isExist) {
+        logger.info(`[Webhook] Tx ${transactionID} already exists, skipping`);
+        continue;
+      }
 
       const match = description.match(/([a-zA-Z0-9_]+)[\s\-\.\|]+(KC|KL|KT|KX)/i);
       const depositMatch = description.match(/NAP([a-zA-Z0-9_]+)/i);
@@ -80,6 +86,8 @@ webhook.post('/mbbank', async (c) => {
         }
         
         if (user) {
+          logger.info(`[Webhook] Auto Deposit detected for user ${user.username}`);
+          
           const isExistTx = await prisma.transaction.findFirst({
             where: { 
               userId: user.id,
@@ -127,6 +135,18 @@ webhook.post('/mbbank', async (c) => {
             if (user.telegramId) {
               await notifyUserByUsername(user.username, userMsg);
             }
+
+            // Gửi Email thông báo cho Admin và User
+            logger.info(`[Webhook] Sending auto-deposit emails for ${user.username}`);
+            await notifyAdminByEmail(
+              `💰 [MoneyWin] NẠP TIỀN: ${user.username} +${amount.toLocaleString('vi-VN')}đ`,
+              buildDepositAdminHtml({ username: user.username, amount, transactionID, balance: updatedUser.balance })
+            );
+            await notifyUserByEmail(
+              user.username,
+              `✅ [MoneyWin] Nạp tiền thành công +${amount.toLocaleString('vi-VN')}đ`,
+              buildDepositUserHtml({ username: user.username, amount, transactionID, balance: updatedUser.balance })
+            );
           }
           processedIds.push(transactionID);
           continue;
@@ -134,7 +154,9 @@ webhook.post('/mbbank', async (c) => {
       }
 
       if (!match) {
-        await notifyAdmin(`<b>⚠️ WEBHOOK: SAI NỘI DUNG</b>\n\n` +
+        logger.warn(`[Webhook] Invalid description format: ${description}`);
+        
+        await (await import('../telegram-bot.js')).notifyAdmin(`<b>⚠️ WEBHOOK: SAI NỘI DUNG</b>\n\n` +
           `💰 Số tiền: <b>${betAmount.toLocaleString()}đ</b>\n` +
           `📝 Nội dung: <code>${description}</code>\n` +
           `🆔 Mã GD: <code>${transactionID}</code>\n\n` +
@@ -154,15 +176,23 @@ webhook.post('/mbbank', async (c) => {
       const username = match[1].toLowerCase();
       const gameCode = match[2].toUpperCase();
       const rule = GAME_RULES[gameCode];
-      if (!rule) continue;
+      if (!rule) {
+        logger.warn(`[Webhook] Rule not found for code: ${gameCode}`);
+        continue;
+      }
 
       const user = await prisma.user.findUnique({ where: { username } });
-      if (!user) continue;
+      if (!user) {
+        logger.warn(`[Webhook] User not found: ${username}`);
+        continue;
+      }
 
       const last4Digits = String(transactionID).slice(-4);
       const lastDigit = parseInt(last4Digits.slice(-1));
       const isWin = rule.winDigits.includes(lastDigit);
       const reward = isWin ? betAmount * rule.rate : 0;
+
+      logger.info(`[Webhook] Game Processed: ${username} | Game: ${rule.name} | Result: ${isWin ? 'WIN' : 'LOST'} | Reward: ${reward}`);
 
       await prisma.$transaction(async (txDb) => {
         await txDb.gameHistory.create({
@@ -177,19 +207,33 @@ webhook.post('/mbbank', async (c) => {
         }
       });
 
-      // [PRO] Gửi thông báo tự động cho cả Admin và User qua Service
+      // [PRO] Gửi thông báo Telegram cho cả Admin và User
+      const { notifyBetResult } = await import('../telegram-bot.js');
       await notifyBetResult({
         username, amount: betAmount,
         gameName: rule.name, lastDigit: last4Digits,
         isWin, reward, transactionId: String(transactionID)
       });
 
+      // Gửi Email thông báo kết quả cược
+      logger.info(`[Webhook] Sending bet result emails for ${username}`);
+      const betData = { username, amount: betAmount, gameName: rule.name, lastDigit: last4Digits, isWin, reward, transactionId: String(transactionID) };
+      await notifyAdminByEmail(
+        `🔔 [MoneyWin] KÈO MỚI: ${username} ${isWin ? 'THẮNG' : 'THUA'} ${betAmount.toLocaleString('vi-VN')}đ`,
+        buildBetResultHtml(betData)
+      );
+      await notifyUserByEmail(
+        username,
+        `${isWin ? '🏆 THẮNG KÈO' : '❌ THUA KÈO'} - MoneyWin`,
+        buildBetResultHtml(betData)
+      );
+
       processedIds.push(transactionID);
     }
 
     return c.json({ status: 'success', processed: processedIds });
   } catch (error) {
-    console.error('[Webhook Error]', error);
+    logger.error('[Webhook Error]', { error: error.message, stack: error.stack });
     return c.json({ status: 'error', message: error.message }, 500);
   }
 });
@@ -201,11 +245,13 @@ webhook.post('/sepay', async (c) => {
     const secretSetting = await prisma.systemSetting.findUnique({ where: { key: 'THUEAPIBANK_SECRET_KEY' } });
     
     if (secretSetting?.value && signature !== secretSetting.value) {
+      logger.warn(`[SePay Webhook] Unauthorized signature: ${signature}`);
       return c.json({ status: 'error', message: 'Unauthorized' }, 401);
     }
 
     const body = await c.req.json();
     if (body?.status !== 'success' || !Array.isArray(body?.transactions)) {
+      logger.info('[SePay Webhook] No transactions or status not success');
       return c.json({ status: 'ok', message: 'No transactions' });
     }
 
@@ -217,8 +263,11 @@ webhook.post('/sepay', async (c) => {
       const amount = parseFloat(tx.amount) || 0;
       const description = tx.description || "";
 
+      logger.info(`[SePay Webhook] Processing Tx: ${transactionID}`);
+
       const existing = await prisma.gameHistory.findFirst({ where: { transactionId: transactionID } });
       if (existing) {
+        logger.info(`[SePay Webhook] Tx ${transactionID} already exists, skipping`);
         results.push(`SKIP:${transactionID}`);
         continue;
       }
@@ -239,7 +288,7 @@ webhook.post('/sepay', async (c) => {
 
     return c.json({ status: 'success', processed: results });
   } catch (error) {
-    console.error('[SePay Webhook Error]', error);
+    logger.error('[SePay Webhook Error]', { error: error.message });
     return c.json({ status: 'error', message: error.message }, 500);
   }
 });

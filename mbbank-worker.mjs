@@ -1,13 +1,12 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './src/lib/prisma.js';
 import mbbankPkg from 'mbbank';
-const { MB } = mbbankPkg;
 import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import { sendMessage, notifyAdmin, notifyUserByUsername, notifyBetResult } from './src/telegram-bot.js';
 
-const prisma = new PrismaClient();
-const CHECK_INTERVAL = 15000;
+const { MB } = mbbankPkg;
+const CHECK_INTERVAL = 20000;
 const LOG_FILE = path.join(process.cwd(), 'logs', 'mbbank.log');
 
 function logToFile(message) {

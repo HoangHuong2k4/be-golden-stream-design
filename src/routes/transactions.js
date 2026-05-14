@@ -71,7 +71,7 @@ transactions.post('/withdraw', authMiddleware, async (c) => {
         `🆔 Mã lệnh: <code>${transaction.id}</code>\n\n` +
         `👉 Vui lòng truy cập admin để duyệt.`;
       
-      await sendMessage(config.TELEGRAM_ADMIN_ID, message);
+      await sendMessage(config.TELEGRAM_ADMIN_ID, message, 'admin');
     }
 
     return c.json({ success: true, transaction });
@@ -106,7 +106,7 @@ transactions.post('/deposit', authMiddleware, async (c) => {
       `💰 Số tiền: <b>${amount.toLocaleString()}đ</b>\n` +
       `🆔 Mã lệnh: <code>${transaction.id}</code>\n\n` +
       `👉 Chờ người dùng chuyển khoản và duyệt.`;
-    await sendMessage(settings.value, message);
+    await sendMessage(settings.value, message, 'admin');
   }
 
   return c.json({ success: true, transaction });
@@ -167,7 +167,7 @@ transactions.post('/admin/:id/approve', authMiddleware, async (c) => {
         `💰 Lệnh ${typeText} trị giá <b>${tx.amount.toLocaleString()}đ</b> của bạn đã được duyệt.\n` +
         `💳 Trạng thái: <b>Thành công</b>\n` +
         `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
-      await sendMessage(tx.user.telegramId, message);
+      await sendMessage(tx.user.telegramId, message, 'notify');
     }
 
     return c.json({ success: true });
@@ -215,7 +215,7 @@ transactions.post('/admin/:id/reject', authMiddleware, async (c) => {
         `Lệnh ${typeText} trị giá <b>${tx.amount.toLocaleString()}đ</b> đã bị từ chối.\n` +
         `⚠️ Lý do: ${reason || 'Không xác định'}\n` +
         `💰 Số tiền đã được hoàn trả vào số dư (nếu là lệnh rút).`;
-      await sendMessage(tx.user.telegramId, message);
+      await sendMessage(tx.user.telegramId, message, 'notify');
     }
 
     return c.json({ success: true });
