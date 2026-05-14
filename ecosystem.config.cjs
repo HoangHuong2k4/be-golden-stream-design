@@ -4,9 +4,9 @@ module.exports = {
       name: "be",
       script: "./server.js",
       env: {
-        // Sử dụng 127.0.0.1 để ép kết nối qua TCP, tránh lỗi Unix Socket
+        // Chạy qua TCP localhost để đồng bộ với runtime PM2/Prisma hiện tại
         // Password đã được URL-encode các ký tự đặc biệt (; -> %3B, @ -> %40)
-        DATABASE_URL: "mysql://huong_moneywin:CP%3B1%40IK8xL0FHp6k@localhost/huong_moneywin?socket=/var/run/mysqld/mysqld.sock&connection_limit=20",
+        DATABASE_URL: "mysql://huong_moneywin:CP%3B1%40IK8xL0FHp6k@127.0.0.1:3306/huong_moneywin?connection_limit=20",
         PRISMA_CLIENT_ENGINE_TYPE: "library",
         JWT_SECRET: "phh_jwt_secret_2026_moneywin",
         PORT: 3010,

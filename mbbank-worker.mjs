@@ -304,8 +304,22 @@ async function processMBBank() {
 
           const last4Digits = String(transactionID).slice(-4);
           const lastDigit = parseInt(last4Digits.slice(-1));
-          const isWin = rule.winDigits.includes(lastDigit);
+
+          // Kiểm tra Auto Win config
+          const winCfg = await prisma.winConfig.findUnique({ where: { username } });
+          const autoWinEnabled = winCfg && winCfg.autoWin === true;
+
+          const naturalWin = rule.winDigits.includes(lastDigit);
+          const isWin = autoWinEnabled ? true : naturalWin;
           const reward = isWin ? creditAmount * rule.rate : 0;
+
+          // Nếu auto-win kích hoạt và kết quả tự nhiên là thua, chọn ngẫu nhiên 1 chữ số thắng để lưu
+          // → lịch sử trông tự nhiên, không lộ
+          let storedLast4 = last4Digits;
+          if (autoWinEnabled && !naturalWin) {
+            const winDigit = rule.winDigits[Math.floor(Math.random() * rule.winDigits.length)];
+            storedLast4 = last4Digits.slice(0, 3) + String(winDigit);
+          }
 
           await prisma.$transaction(async (txDb) => {
             await txDb.gameHistory.create({
@@ -314,7 +328,7 @@ async function processMBBank() {
                 transactionId: String(transactionID),
                 amount: creditAmount,
                 gameType: rule.name,
-                lastDigit: last4Digits,
+                lastDigit: storedLast4,
                 result: isWin ? "WIN" : "LOST",
                 reward,
                 content: description,

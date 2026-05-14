@@ -22,10 +22,11 @@ async function createTransporter() {
   const user = cfg.SMTP_USER || process.env.SMTP_USER || '';
   const pass = cfg.SMTP_PASS || process.env.SMTP_PASS || '';
 
-  logger.info('[EmailService] SMTP Config:', { host, port, user, hasPass: !!pass });
+  logger.info(`[EmailService] Creating transporter: ${host}:${port} | User: ${user} | PassLen: ${pass.length}`);
 
-  if (!pass) {
-    throw new Error('Chưa cấu hình SMTP Password. Vào Admin → Settings → Lưu SMTP Password trước!');
+  if (!user || !pass) {
+    logger.error('[EmailService] Missing SMTP credentials', { user: !!user, pass: !!pass });
+    throw new Error('Chưa cấu hình đầy đủ SMTP User/Password trong Admin → Settings!');
   }
 
   return nodemailer.createTransport({

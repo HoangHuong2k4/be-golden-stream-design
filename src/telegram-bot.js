@@ -142,6 +142,12 @@ function setupBotCommands(bot) {
       `🍀 Chúc bạn vạn sự may mắn!`
     );
   });
+
+  bot.command('id', (ctx) => {
+    return ctx.replyWithHTML(
+      `🆔 Telegram ID cua ban la: <code>${ctx.chat.id}</code>`
+    );
+  });
 }
 
 /**
@@ -151,7 +157,21 @@ export async function sendMessage(chatId, text, type = 'default') {
   if (!chatId) return;
   const bot = await getBot(type);
   if (!bot) throw new Error("Chưa cấu hình Telegram Bot Token");
-  return await bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' });
+  const normalizedChatId = String(chatId).trim();
+
+  try {
+    return await bot.telegram.sendMessage(normalizedChatId, text, { parse_mode: 'HTML' });
+  } catch (error) {
+    const rawMessage = error?.response?.description || error?.message || 'Telegram send failed';
+
+    if (rawMessage.includes('chat not found')) {
+      throw new Error(
+        `Telegram chat not found (${type}). Nguoi dung can /start bot nay truoc hoac Telegram ID dang sai.`
+      );
+    }
+
+    throw new Error(rawMessage);
+  }
 }
 
 /**

@@ -13,7 +13,7 @@ notifications.use('*', authMiddleware, adminMiddleware);
 notifications.post('/telegram', async (c) => {
   try {
     const { telegramId, message, botType = 'admin' } = await c.req.json();
-    
+
     if (!telegramId || !message) {
       return c.json({ error: 'Thiếu telegramId hoặc message' }, 400);
     }
@@ -60,7 +60,7 @@ notifications.post('/email', async (c) => {
 
     return c.json({ success: true });
   } catch (e) {
-    logger.error("[NotificationsRoute] Email Error:", { to, error: e.message });
+    logger.error("[NotificationsRoute] Email Error:", { error: e.message });
     return c.json({ error: e.message }, 500);
   }
 });

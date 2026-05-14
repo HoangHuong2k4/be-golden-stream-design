@@ -14,12 +14,15 @@ users.get('/', async (c) => {
     const search = c.req.query('search') || '';
     const skip = (page - 1) * limit;
 
-    const where = search ? {
-      OR: [
-        { username: { contains: search } },
-        { telegramId: { contains: search } },
-      ]
-    } : {};
+    const where = {
+      role: { not: 'ADMIN' },
+      ...(search ? {
+        OR: [
+          { username: { contains: search } },
+          { telegramId: { contains: search } },
+        ]
+      } : {})
+    };
 
     const [total, items] = await Promise.all([
       prisma.user.count({ where }),

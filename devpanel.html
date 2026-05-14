@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+  <title>Dev Panel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #12121c; --surface2: #1a1a2e;
+      --border: #2d2d4e; --accent: #7c3aed; --accent2: #a855f7;
+      --green: #22c55e; --red: #ef4444; --yellow: #f59e0b;
+      --text: #e2e8f0; --muted: #64748b;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    /* Login */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 50% 0%, #1e1040 0%, var(--bg) 70%);
+    }
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 40px 36px; width: 360px;
+      box-shadow: 0 25px 60px rgba(0,0,0,.6);
+    }
+    .login-card h1 { font-size: 22px; margin-bottom: 6px; }
+    .login-card p { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+    .login-card label { display: block; font-size: 13px; margin-bottom: 6px; color: var(--muted); }
+    .login-card input {
+      width: 100%; padding: 10px 14px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 14px; outline: none; margin-bottom: 16px;
+    }
+    .login-card input:focus { border-color: var(--accent); }
+    #login-error { color: var(--red); font-size: 13px; margin-top: 8px; }
+
+    /* Layout */
+    #main-panel { display: none; }
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 28px; display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 18px; display: flex; align-items: center; gap: 10px; }
+    .badge {
+      background: #7c3aed22; color: var(--accent2);
+      border: 1px solid #7c3aed44; font-size: 11px;
+      padding: 2px 8px; border-radius: 20px;
+    }
+    .logout-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); padding: 6px 14px; border-radius: 6px;
+      cursor: pointer; font-size: 13px; transition: all .2s;
+    }
+    .logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+    main { max-width: 1000px; margin: 28px auto; padding: 0 20px; }
+
+    .section-title {
+      font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::before {
+      content: ''; display: inline-block; width: 3px; height: 15px;
+      background: var(--accent); border-radius: 2px;
+    }
+
+    .warning-banner {
+      background: #f59e0b0d; border: 1px solid #f59e0b33;
+      border-radius: 10px; padding: 11px 16px; font-size: 13px;
+      color: var(--yellow); margin-bottom: 20px;
+    }
+
+    /* Add Form */
+    .add-form {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 20px; margin-bottom: 24px;
+      display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
+    }
+    .add-form .field { display: flex; flex-direction: column; gap: 5px; }
+    .add-form label { font-size: 12px; color: var(--muted); }
+    .add-form input[type="text"] {
+      padding: 9px 12px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 13px; outline: none; min-width: 200px;
+    }
+    .add-form input:focus { border-color: var(--accent); }
+
+    /* Switch */
+    .toggle-field { display: flex; align-items: center; gap: 8px; padding-bottom: 2px; }
+    .switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: var(--border); border-radius: 24px; transition: .3s;
+    }
+    .slider::before {
+      content: ''; position: absolute; height: 18px; width: 18px;
+      left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .3s;
+    }
+    input:checked + .slider { background: var(--green); }
+    input:checked + .slider::before { transform: translateX(18px); }
+
+    /* Buttons */
+    .btn-primary {
+      padding: 9px 20px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; font-size: 13px; font-weight: 600;
+      border: none; cursor: pointer; transition: opacity .2s; white-space: nowrap;
+    }
+    .btn-primary:hover { opacity: .85; }
+
+    /* Tables */
+    .table-wrap {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden; margin-bottom: 28px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: var(--surface2); }
+    th { padding: 11px 14px; text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+    td { padding: 11px 14px; font-size: 12px; border-top: 1px solid var(--border); }
+    tr:hover td { background: rgba(124,58,237,.04); }
+
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    }
+    .status-on { background: #22c55e1a; color: var(--green); border: 1px solid #22c55e33; }
+    .status-off { background: #ef44441a; color: var(--red); border: 1px solid #ef444433; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .result-win { color: var(--green); font-weight: 700; }
+    .result-lost { color: var(--red); font-weight: 700; }
+    .override-tag {
+      font-size: 10px; background: #a855f722; color: var(--accent2);
+      border: 1px solid #a855f733; padding: 1px 6px; border-radius: 10px;
+      margin-left: 4px; white-space: nowrap;
+    }
+    .action-btns { display: flex; gap: 6px; }
+    .btn-sm {
+      padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+      cursor: pointer; border: 1px solid transparent; transition: all .2s;
+    }
+    .btn-toggle-on { background: #22c55e1a; color: var(--green); border-color: #22c55e33; }
+    .btn-toggle-on:hover { background: var(--green); color: #fff; }
+    .btn-toggle-off { background: #ef44441a; color: var(--red); border-color: #ef444433; }
+    .btn-toggle-off:hover { background: var(--red); color: #fff; }
+    .btn-del { background: transparent; color: var(--muted); border-color: var(--border); }
+    .btn-del:hover { border-color: var(--red); color: var(--red); }
+    .btn-hist { background: #7c3aed1a; color: var(--accent2); border-color: #7c3aed33; }
+    .btn-hist:hover { background: var(--accent); color: #fff; }
+
+    .empty-row td { text-align: center; color: var(--muted); padding: 28px; }
+    .mono { font-family: 'Courier New', monospace; font-size: 11px; }
+
+    /* History panel */
+    #history-panel {
+      background: var(--surface); border: 1px solid #7c3aed44;
+      border-radius: 12px; margin-bottom: 28px; display: none; overflow: hidden;
+    }
+    .history-header {
+      background: #7c3aed14; border-bottom: 1px solid #7c3aed33;
+      padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .history-header h3 { font-size: 14px; }
+    .close-hist { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 18px; }
+    .close-hist:hover { color: var(--text); }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px 16px; font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      transform: translateY(80px); opacity: 0; transition: all .3s; z-index: 1000;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error { border-left: 3px solid var(--red); }
+
+    .digit-tag {
+      display: inline-block; background: var(--surface2); border: 1px solid var(--border);
+      padding: 1px 7px; border-radius: 6px; font-family: monospace; font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>🔐 Dev Panel</h1>
+    <p>Trang quản trị nội bộ · Không phân phối</p>
+    <label>Access Token</label>
+    <input type="password" id="token-input" placeholder="Nhập mật khẩu truy cập..." onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="btn-primary" style="width:100%" onclick="doLogin()">Đăng nhập</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="main-panel">
+  <header>
+    <h1>⚙️ Dev Control Panel <span class="badge">INTERNAL</span></h1>
+    <button class="logout-btn" onclick="doLogout()">Đăng xuất</button>
+  </header>
+
+  <main>
+    <div class="warning-banner">
+      ⚠️ <strong>Cảnh báo:</strong> Mọi thay đổi tại đây ảnh hưởng trực tiếp đến kết quả game. Chỉ dùng cho mục đích nội bộ.
+    </div>
+
+    <div class="section-title">Thêm / Cập nhật người chơi</div>
+    <div class="add-form">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="inp-username" placeholder="vd: hhuong123" />
+      </div>
+      <div class="field">
+        <label>Auto Win</label>
+        <div class="toggle-field">
+          <label class="switch">
+            <input type="checkbox" id="inp-autowin" checked />
+            <span class="slider"></span>
+          </label>
+          <label for="inp-autowin" style="cursor:pointer;font-size:13px">Bật</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn-primary" onclick="addConfig()">Lưu cấu hình</button>
+      </div>
+    </div>
+
+    <div class="section-title">Danh sách người chơi được quản lý</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Auto Win</th>
+            <th>Cập nhật lúc</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody id="config-tbody">
+          <tr class="empty-row"><td colspan="4">Đang tải...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- History Panel -->
+    <div id="history-panel">
+      <div class="history-header">
+        <h3 id="history-title">📋 Lịch sử game</h3>
+        <button class="close-hist" onclick="closeHistory()">✕</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Mã GD</th>
+              <th>Loại cược</th>
+              <th>Số tiền</th>
+              <th>4 số cuối GD</th>
+              <th>Số cuối thực tế</th>
+              <th>Kết quả tự nhiên</th>
+              <th>Kết quả lưu</th>
+              <th>Thưởng</th>
+              <th>Thời gian</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API_BASE = '/api/devx9k7q2';
+  let TOKEN = '';
+
+  function getToken() { return TOKEN || localStorage.getItem('dev_token') || ''; }
+
+  function doLogin() {
+    const t = document.getElementById('token-input').value.trim();
+    if (!t) return;
+    TOKEN = t;
+    loadConfig().then(ok => {
+      if (ok) {
+        localStorage.setItem('dev_token', t);
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-panel').style.display = 'block';
+      } else {
+        TOKEN = '';
+        document.getElementById('login-error').textContent = 'Mật khẩu không đúng!';
+      }
+    });
+  }
+
+  function doLogout() {
+    TOKEN = ''; localStorage.removeItem('dev_token');
+    document.getElementById('main-panel').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('token-input').value = '';
+  }
+
+  async function apiFetch(path, options = {}) {
+    return fetch(API_BASE + path, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', 'x-dev-token': getToken(), ...(options.headers || {}) }
+    });
+  }
+
+  async function loadConfig() {
+    try {
+      const res = await apiFetch('/winconfig');
+      if (res.status === 401) return false;
+      const data = await res.json();
+      renderTable(data);
+      return true;
+    } catch { return false; }
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('config-tbody');
+    if (!data.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Chưa có người chơi nào trong danh sách</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(item => `
+      <tr>
+        <td><strong>${item.username}</strong></td>
+        <td>
+          <span class="status-badge ${item.autoWin ? 'status-on' : 'status-off'}">
+            <span class="status-dot"></span>${item.autoWin ? '🎯 Auto WIN' : 'Tắt'}
+          </span>
+        </td>
+        <td style="color:var(--muted)">${new Date(item.updatedAt).toLocaleString('vi-VN')}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-sm ${item.autoWin ? 'btn-toggle-off' : 'btn-toggle-on'}" onclick="toggleUser('${item.username}')">
+              ${item.autoWin ? '⏸ Tắt' : '▶ Bật'}
+            </button>
+            <button class="btn-sm btn-hist" onclick="showHistory('${item.username}')">📋 Lịch sử</button>
+            <button class="btn-sm btn-del" onclick="deleteUser('${item.username}')">✕</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function addConfig() {
+    const username = document.getElementById('inp-username').value.trim();
+    const autoWin = document.getElementById('inp-autowin').checked;
+    if (!username) { showToast('Vui lòng nhập username!', 'error'); return; }
+    try {
+      const res = await apiFetch('/winconfig', { method: 'POST', body: JSON.stringify({ username, autoWin }) });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || 'Lỗi!', 'error'); return; }
+      document.getElementById('inp-username').value = '';
+      showToast(`✅ Đã lưu cấu hình cho "${username}"`, 'success');
+      loadConfig();
+    } catch { showToast('Lỗi kết nối!', 'error'); }
+  }
+
+  async function toggleUser(username) {
+    try {
+      const res = await apiFetch(`/winconfig/${username}/toggle`, { method: 'PATCH' });
+      const data = await res.json();
+      showToast(`🔄 "${username}" Auto Win: ${data.autoWin ? 'BẬT' : 'TẮT'}`, 'success');
+      loadConfig();
+    } catch { showToast('Lỗi kết nối!', 'error'); }
+  }
+
+  async function deleteUser(username) {
+    if (!confirm(`Xác nhận xóa "${username}" khỏi danh sách?`)) return;
+    try {
+      await apiFetch(`/winconfig/${username}`, { method: 'DELETE' });
+      showToast(`🗑️ Đã xóa "${username}"`, 'success');
+      closeHistory();
+      loadConfig();
+    } catch { showToast('Lỗi kết nối!', 'error'); }
+  }
+
+  async function showHistory(username) {
+    document.getElementById('history-title').textContent = `📋 Lịch sử game của: ${username}`;
+    document.getElementById('history-tbody').innerHTML = '<tr class="empty-row"><td colspan="9">Đang tải...</td></tr>';
+    document.getElementById('history-panel').style.display = 'block';
+    document.getElementById('history-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+      const res = await apiFetch(`/history/${username}?limit=30`);
+      const data = await res.json();
+      if (!res.ok) { document.getElementById('history-tbody').innerHTML = `<tr class="empty-row"><td colspan="9">${data.error}</td></tr>`; return; }
+
+      const { autoWinActive, history } = data;
+      document.getElementById('history-title').textContent = `📋 Lịch sử của: ${username} ${autoWinActive ? '🟢 [AUTO WIN ĐANG BẬT]' : '🔴 [AUTO WIN TẮT]'}`;
+
+      if (!history.length) {
+        document.getElementById('history-tbody').innerHTML = '<tr class="empty-row"><td colspan="9">Chưa có lịch sử game</td></tr>';
+        return;
+      }
+
+      const GAME_RULES = {
+        'CHẴN': [2, 4, 6, 8], 'LẺ': [1, 3, 5, 7],
+        'TÀI': [5, 6, 7, 8], 'XỈU': [1, 2, 3, 4],
+      };
+
+      document.getElementById('history-tbody').innerHTML = history.map(h => {
+        const rule = GAME_RULES[h.gameType];
+        const winDigitsStr = rule ? rule.join(', ') : '?';
+        const isOverride = h.wasOverridden;
+        const naturalClass = h.naturalResult === 'WIN' ? 'result-win' : 'result-lost';
+        const resultClass = h.result === 'WIN' ? 'result-win' : 'result-lost';
+        return `
+          <tr>
+            <td class="mono">${String(h.transactionId).slice(-8)}...</td>
+            <td><strong>${h.gameType}</strong> <span style="color:var(--muted);font-size:10px">[${winDigitsStr}]</span></td>
+            <td>${Number(h.amount).toLocaleString('vi-VN')}đ</td>
+            <td class="mono"><span class="digit-tag">${h.lastDigit}</span></td>
+            <td><span class="digit-tag">${h.lastDigitActual}</span></td>
+            <td class="${naturalClass}">${h.naturalResult || '?'}</td>
+            <td>
+              <span class="${resultClass}">${h.result}</span>
+              ${isOverride ? '<span class="override-tag">⚡ OVERRIDE</span>' : ''}
+            </td>
+            <td style="color:var(--green)">${h.reward > 0 ? '+' + Number(h.reward).toLocaleString('vi-VN') + 'đ' : '—'}</td>
+            <td style="color:var(--muted)">${new Date(h.createdAt).toLocaleString('vi-VN')}</td>
+          </tr>
+        `;
+      }).join('');
+    } catch (e) {
+      document.getElementById('history-tbody').innerHTML = `<tr class="empty-row"><td colspan="9">Lỗi: ${e.message}</td></tr>`;
+    }
+  }
+
+  function closeHistory() {
+    document.getElementById('history-panel').style.display = 'none';
+  }
+
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type}`;
+    void t.offsetWidth;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('dev_token');
+    if (saved) {
+      TOKEN = saved;
+      loadConfig().then(ok => {
+        if (ok) {
+          document.getElementById('login-screen').style.display = 'none';
+          document.getElementById('main-panel').style.display = 'block';
+        } else {
+          localStorage.removeItem('dev_token');
+          TOKEN = '';
+        }
+      });
+    }
+  });
+</script>
+</body>
+</html>

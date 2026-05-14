@@ -13,6 +13,7 @@ import dashboard from './routes/dashboard.js';
 import notifications from './routes/notifications.js';
 import publicApi from './routes/public.js';
 import upload from './routes/upload.js';
+import devpanel from './routes/devpanel.js';
 import logger from './lib/logger.js';
 
 
@@ -62,6 +63,17 @@ app.route('/api/game', game);
 app.route('/api/webhook', webhook);
 app.route('/api/transactions', transactions);
 app.route('/api/admin/news', news);
+app.route('/api/devx9k7q2', devpanel);
+
+// Dev Panel UI (không bị index)
+app.get('/devx9k7q2', (c) => {
+  try {
+    const html = fs.readFileSync(path.resolve(process.cwd(), 'devpanel.html'), 'utf-8');
+    return c.html(html);
+  } catch (err) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+});
 
 
 // 404
