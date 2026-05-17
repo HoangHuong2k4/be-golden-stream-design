@@ -35,7 +35,7 @@ publicApi.get('/system-banks', async (c) => {
  */
 publicApi.get('/config', async (c) => {
   try {
-    const keys = ['TELEGRAM_BOT_USERNAME'];
+    const keys = ['TELEGRAM_BOT_USERNAME', 'TELEGRAM_GROUP_URL'];
     const items = await prisma.systemSetting.findMany({
       where: { key: { in: keys } }
     });

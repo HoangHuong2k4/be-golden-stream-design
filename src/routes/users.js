@@ -85,7 +85,18 @@ users.put('/:id', async (c) => {
 // DELETE /api/admin/users/:id
 users.delete('/:id', async (c) => {
   try {
-    await prisma.user.delete({ where: { id: c.req.param('id') } });
+    const userId = c.req.param('id');
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return c.json({ error: 'User không tồn tại' }, 404);
+
+    await prisma.$transaction([
+      prisma.gameHistory.deleteMany({ where: { userId } }),
+      prisma.transaction.deleteMany({ where: { userId } }),
+      prisma.userBank.deleteMany({ where: { userId } }),
+      prisma.winConfig.deleteMany({ where: { username: user.username } }),
+      prisma.user.delete({ where: { id: userId } }),
+    ]);
+    
     return c.json({ success: true });
   } catch (e) {
     return c.json({ error: e.message }, 500);

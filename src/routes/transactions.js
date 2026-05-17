@@ -24,8 +24,19 @@ transactions.post('/withdraw', authMiddleware, async (c) => {
   const userJwt = c.get('user');
   const { amount, bankDetails } = await c.req.json();
 
-  if (!amount || amount < 10000) {
-    return c.json({ error: 'Số tiền rút tối thiểu là 10,000đ' }, 400);
+  const minMaxSettings = await prisma.systemSetting.findMany({
+    where: { key: { in: ['MIN_WITHDRAW', 'MAX_WITHDRAW'] } }
+  });
+  const limitConfig = Object.fromEntries(minMaxSettings.map(s => [s.key, s.value]));
+  const minWithdraw = limitConfig.MIN_WITHDRAW ? parseFloat(limitConfig.MIN_WITHDRAW) : 10000;
+  const maxWithdraw = limitConfig.MAX_WITHDRAW ? parseFloat(limitConfig.MAX_WITHDRAW) : 300000000;
+
+  if (!amount || amount < minWithdraw) {
+    return c.json({ error: `Số tiền rút tối thiểu là ${minWithdraw.toLocaleString()}đ` }, 400);
+  }
+  
+  if (amount > maxWithdraw) {
+    return c.json({ error: `Số tiền rút tối đa là ${maxWithdraw.toLocaleString()}đ` }, 400);
   }
 
   const user = await prisma.user.findUnique({ where: { id: userJwt.id } });

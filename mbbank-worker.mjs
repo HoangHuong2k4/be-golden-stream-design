@@ -158,6 +158,25 @@ async function processMBBank() {
           const transactionID = tx.refNo || tx.transactionID;
           const description = tx.transactionDesc || tx.description || "";
 
+          const isExist = await prisma.gameHistory.findUnique({
+            where: { transactionId: String(transactionID) }
+          });
+          if (isExist) {
+            logToFile(`   [SKIP] Giao dịch này đã xử lý trước đó (gameHistory).`);
+            continue;
+          }
+
+          const isExistTx = await prisma.transaction.findFirst({
+            where: {
+              type: "DEPOSIT",
+              bankDetails: { contains: String(transactionID) }
+            }
+          });
+          if (isExistTx) {
+            logToFile(`   [SKIP] Giao dịch nạp tiền ${transactionID} đã xử lý (transaction).`);
+            continue;
+          }
+
           // Kiểm tra hạn mức cược từ cấu hình ngân hàng trong DB
           let rejectReason = null;
           if (bank.minBet && creditAmount < bank.minBet) rejectReason = `nhỏ hơn Min (${bank.minBet.toLocaleString()}đ)`;
@@ -173,26 +192,38 @@ async function processMBBank() {
               `🆔 Mã GD: <code>${transactionID}</code>\n` +
               `❌ Lý do: <b>Số tiền ${rejectReason}</b>`);
 
+            let userId = null;
             // [PRO] Thông báo User qua Service
             const match = description.match(/([a-zA-Z0-9_]+)[\s\-\.\|]+(KC|KL|KT|KX)/i);
             if (match) {
               const username = match[1].toLowerCase();
+              const user = await prisma.user.findUnique({ where: { username } });
+              if (user) {
+                userId = user.id;
+              }
               await notifyUserByUsername(username, `⚠️ <b>CẢNH BÁO HẠN MỨC!</b>\n\n` +
                 `Giao dịch <code>${transactionID}</code> của bạn không thành công vì số tiền <b>${creditAmount.toLocaleString()}đ</b> ${rejectReason}.\n\n` +
                 `☘️ Vui lòng kiểm tra lại hạn mức cược của ngân hàng nhé!`);
             }
+
+            // Lưu vào lịch sử để không bị lặp lại ở lần quét sau
+            await prisma.gameHistory.create({
+              data: {
+                userId: userId,
+                transactionId: String(transactionID),
+                amount: creditAmount,
+                gameType: "INVALID",
+                lastDigit: String(transactionID).slice(-1) || "0",
+                result: "LOST",
+                reward: 0,
+                content: description,
+              }
+            });
+
             continue;
           }
 
           logToFile(`-> Tìm thấy giao dịch: ${transactionID} | Số tiền: ${creditAmount} | Nội dung: ${description}`);
-
-          const isExist = await prisma.gameHistory.findUnique({
-            where: { transactionId: String(transactionID) }
-          });
-          if (isExist) {
-            logToFile(`   [SKIP] Giao dịch này đã xử lý trước đó.`);
-            continue;
-          }
 
           // Regex linh hoạt: Tìm [username] [phân cách] [code]. Phân cách có thể là khoảng trắng, dấu gạch ngang, dấu chấm...
           const match = description.match(/([a-zA-Z0-9_]+)[\s\-\.\|]+(KC|KL|KT|KX)/i);
@@ -283,7 +314,7 @@ async function processMBBank() {
                 transactionId: String(transactionID),
                 amount: creditAmount,
                 gameType: "INVALID",
-                lastDigit: parseInt(String(transactionID).slice(-1)),
+                lastDigit: String(transactionID).slice(-1) || "0",
                 result: "LOST",
                 reward: 0,
                 content: description,
